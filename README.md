@@ -13,17 +13,23 @@ A modern admin dashboard web application built with Go, HTML, CSS, and JavaScrip
 
 ## Quick Start
 
-1. **Install dependencies**:
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/seanrobmerriam/Godash.git
+   cd Godash
+   ```
+
+2. **Install dependencies**:
    ```bash
    go mod tidy
    ```
 
-2. **Run the server**:
+3. **Run the server**:
    ```bash
    go run ./cmd/server
    ```
 
-3. **Access the dashboard**:
+4. **Access the dashboard**:
    - Open http://localhost:8080/dashboard
    - Default credentials: `admin` / `password`
 
