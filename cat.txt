@@ -1,0 +1,9 @@
+head(1), 
+more(1), 
+pr(1), 
+sh(1), 
+tail(1),
+vis(1), 
+zcat(1), 
+fcntl(2), 
+setbuf(3)
