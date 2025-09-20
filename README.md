@@ -2,6 +2,8 @@
 
 A modern admin dashboard web application built with Go, HTML, CSS, and JavaScript. Features a modular architecture with widget-based dashboard components, real-time updates, and responsive design.
 
+![Alt text]([/Godash/web/static/images/godash1.png)raw=true "Optional Title")
+
 ## Features
 
 - **Modular Architecture**: Clean separation with dedicated packages for handlers, middleware, models, and services
