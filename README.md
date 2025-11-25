@@ -65,6 +65,5 @@ The application can be configured using environment variables:
 - `GET /api/stats` - System statistics
 - `GET /api/users` - User list (admin only)
 
-## Development
 
-See [WARP.md](WARP.md) for detailed development commands and architecture documentation.
+
