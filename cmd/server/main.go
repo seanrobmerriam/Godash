@@ -66,30 +66,30 @@ func main() {
 	// Setup routes
 	r := mux.NewRouter()
 
-	// Template routes
-	r.HandleFunc("/caddy/instances", func(w http.ResponseWriter, r *http.Request) {
+	// Template routes (protected)
+	r.Handle("/caddy/instances", authMiddleware.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := middleware.GetCurrentUser(r)
 		data := struct {
 			User interface{}
 		}{User: user}
 		templates.ExecuteTemplate(w, "instances.html", data)
-	}).Methods("GET")
+	}))).Methods("GET")
 
-	r.HandleFunc("/caddy/analytics", func(w http.ResponseWriter, r *http.Request) {
+	r.Handle("/caddy/analytics", authMiddleware.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := middleware.GetCurrentUser(r)
 		data := struct {
 			User interface{}
 		}{User: user}
 		templates.ExecuteTemplate(w, "analytics.html", data)
-	}).Methods("GET")
+	}))).Methods("GET")
 
-	r.HandleFunc("/caddy/instances/{id}/config", func(w http.ResponseWriter, r *http.Request) {
+	r.Handle("/caddy/instances/{id}/config", authMiddleware.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := middleware.GetCurrentUser(r)
 		data := struct {
 			User interface{}
 		}{User: user}
 		templates.ExecuteTemplate(w, "config-editor.html", data)
-	}).Methods("GET")
+	}))).Methods("GET")
 
 	// Public routes
 	r.HandleFunc("/", h.HomeHandler)

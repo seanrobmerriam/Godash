@@ -53,6 +53,10 @@ class CaddyDashboard {
     }
 
     async loadInstances() {
+        // Hide default empty state when loading
+        const defaultEmpty = document.getElementById('default-empty-state');
+        if (defaultEmpty) defaultEmpty.style.display = 'none';
+
         try {
             const response = await fetch('/api/caddy/instances');
             const data = await response.json();
@@ -66,6 +70,8 @@ class CaddyDashboard {
             }
         } catch (error) {
             console.error('Failed to load instances:', error);
+            // Show default empty state on error
+            if (defaultEmpty) defaultEmpty.style.display = 'block';
             this.showError('Failed to load Caddy instances');
         }
     }
@@ -212,6 +218,7 @@ class CaddyDashboard {
         const totalEl = document.getElementById('total-instances');
         const onlineEl = document.getElementById('online-instances');
         const offlineEl = document.getElementById('offline-instances');
+        const unknownEl = document.getElementById('unknown-instances');
 
         if (totalEl) totalEl.textContent = this.instances.length;
         if (onlineEl) {
@@ -221,6 +228,10 @@ class CaddyDashboard {
         if (offlineEl) {
             const offline = this.instances.filter(i => i.status === 'offline').length;
             offlineEl.textContent = offline;
+        }
+        if (unknownEl) {
+            const unknown = this.instances.filter(i => !i.status || i.status === 'unknown').length;
+            unknownEl.textContent = unknown;
         }
     }
 

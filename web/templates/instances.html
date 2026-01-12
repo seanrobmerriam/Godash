@@ -51,6 +51,12 @@
     </style>
 </head>
 <body>
+    <noscript>
+        <div style="padding: 2rem; text-align: center; background: #fef3c7; color: #92400e;">
+            <h2>JavaScript Required</h2>
+            <p>This page requires JavaScript to manage Caddy instances. Please enable JavaScript in your browser.</p>
+        </div>
+    </noscript>
     <header class="header">
         <div class="container">
             <div class="header-content">
@@ -105,7 +111,13 @@
 
             <!-- Instances Grid -->
             <div id="instances-container" class="instances-grid">
-                <!-- Instances will be rendered here -->
+                <!-- Default empty state shown by default, JS will replace this -->
+                <div class="empty-state" id="default-empty-state">
+                    <p>No Caddy instances configured</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('add-instance-modal').style.display='block'">
+                        Add First Instance
+                    </button>
+                </div>
             </div>
         </div>
     </main>
