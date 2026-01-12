@@ -2,12 +2,15 @@ package main
 
 import (
 	"fmt"
+	"godash/internal/caddy"
 	"godash/internal/config"
 	"godash/internal/handlers"
 	"godash/internal/middleware"
 	"godash/internal/services"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/gorilla/mux"
 )
@@ -23,10 +26,35 @@ func main() {
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(cfg.Session.SecretKey, userService)
 
-	// Initialize handlers
-	h, err := handlers.New(userService, dashboardService, authMiddleware)
+	// Initialize Caddy services
+	var h *handlers.Handlers
+	var err error
+
+	// Create data directory
+	dataDir := "data"
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		log.Printf("Warning: Could not create data directory: %v", err)
+	}
+
+	// Initialize instance store
+	instanceStore, err := caddy.NewInstanceStore(filepath.Join(dataDir, "instances.json"))
 	if err != nil {
-		log.Fatalf("Failed to initialize handlers: %v", err)
+		log.Printf("Warning: Could not initialize instance store: %v", err)
+		log.Println("Caddy features will be unavailable")
+		h, _ = handlers.New(userService, dashboardService, authMiddleware)
+	} else {
+		// Initialize analytics store
+		analyticsStore, err := caddy.NewAnalyticsStore(filepath.Join(dataDir, "analytics"))
+		if err != nil {
+			log.Printf("Warning: Could not initialize analytics store: %v", err)
+			log.Println("Analytics features will be unavailable")
+		}
+
+		// Initialize handlers with Caddy services
+		h, err = handlers.NewWithCaddy(userService, dashboardService, authMiddleware, instanceStore, analyticsStore)
+		if err != nil {
+			log.Fatalf("Failed to initialize handlers: %v", err)
+		}
 	}
 
 	// Setup routes
@@ -51,7 +79,25 @@ func main() {
 	api.HandleFunc("/stats", h.APISystemStatsHandler).Methods("GET")
 	api.HandleFunc("/users", h.APIUsersHandler).Methods("GET")
 
-	// Admin API routes
+	// Caddy API routes
+	caddyAPI := api.PathPrefix("/caddy").Subrouter()
+
+	// Instance management
+	caddyAPI.HandleFunc("/instances", h.APIListInstancesHandler).Methods("GET")
+	caddyAPI.HandleFunc("/instances", h.APICreateInstanceHandler).Methods("POST")
+	caddyAPI.HandleFunc("/instances/{id}", h.APIGetInstanceHandler).Methods("GET")
+	caddyAPI.HandleFunc("/instances/{id}", h.APIUpdateInstanceHandler).Methods("PUT")
+	caddyAPI.HandleFunc("/instances/{id}", h.APIDeleteInstanceHandler).Methods("DELETE")
+	caddyAPI.HandleFunc("/instances/{id}/test", h.APITestInstanceHandler).Methods("POST")
+	caddyAPI.HandleFunc("/instances/{id}/refresh", h.APIRefreshInstanceHandler).Methods("POST")
+
+	// Instance operations
+	caddyAPI.HandleFunc("/instances/{id}/metrics", h.APIInstanceMetricsHandler).Methods("GET")
+	caddyAPI.HandleFunc("/instances/{id}/config", h.APIInstanceConfigHandler).Methods("GET")
+	caddyAPI.HandleFunc("/instances/{id}/logs", h.APIInstanceLogsHandler).Methods("GET")
+	caddyAPI.HandleFunc("/instances/{id}/reload", h.APIInstanceReloadHandler).Methods("POST")
+
+	// Admin API routes (admin only)
 	adminAPI := api.PathPrefix("/admin").Subrouter()
 	adminAPI.Use(authMiddleware.RequireAdmin)
 
@@ -60,6 +106,7 @@ func main() {
 	log.Printf("Starting server on %s", addr)
 	log.Printf("Dashboard available at: http://%s/dashboard", addr)
 	log.Printf("Default credentials: admin / password")
+	log.Printf("Caddy API available at: http://%s/api/caddy", addr)
 
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
