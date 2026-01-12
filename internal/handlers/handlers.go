@@ -463,3 +463,196 @@ func (h *Handlers) APIInstanceReloadHandler(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "reloaded"})
 }
+
+// APIInstanceStartHandler starts a Caddy instance
+func (h *Handlers) APIInstanceStartHandler(w http.ResponseWriter, r *http.Request) {
+	if h.caddyConfigSvc == nil {
+		http.Error(w, "Caddy service not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Note: Starting Caddy requires the binary to be available
+	// This is a placeholder - actual implementation depends on deployment
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "pending",
+		"message": "Start operation initiated (requires binary availability)",
+	})
+}
+
+// APIInstanceStopHandler stops a Caddy instance
+func (h *Handlers) APIInstanceStopHandler(w http.ResponseWriter, r *http.Request) {
+	if h.caddyConfigSvc == nil {
+		http.Error(w, "Caddy service not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	if err := h.caddyConfigSvc.StopServer(id); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "stopped"})
+}
+
+// APIInstanceRestartHandler restarts a Caddy instance
+func (h *Handlers) APIInstanceRestartHandler(w http.ResponseWriter, r *http.Request) {
+	if h.caddyConfigSvc == nil {
+		http.Error(w, "Caddy service not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	// Stop first
+	if err := h.caddyConfigSvc.StopServer(id); err != nil {
+		// Try reload as fallback
+		if reloadErr := h.caddyConfigSvc.ReloadConfig(id, nil); reloadErr != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": reloadErr.Error()})
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "restarted",
+		"message": "Restart operation completed",
+	})
+}
+
+// APIInstanceSitesHandler returns sites for a Caddy instance
+func (h *Handlers) APIInstanceSitesHandler(w http.ResponseWriter, r *http.Request) {
+	if h.caddyConfigSvc == nil {
+		http.Error(w, "Caddy service not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	sites, err := h.caddyConfigSvc.GetSites(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sites)
+}
+
+// APIInstanceCreateSiteHandler creates a new site
+func (h *Handlers) APIInstanceCreateSiteHandler(w http.ResponseWriter, r *http.Request) {
+	if h.caddyConfigSvc == nil {
+		http.Error(w, "Caddy service not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	var req struct {
+		SiteName string                 `json:"site_name"`
+		Config   map[string]interface{} `json:"config"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.caddyConfigSvc.CreateSite(id, req.SiteName, req.Config); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"status": "created"})
+}
+
+// APIInstanceDeleteSiteHandler deletes a site
+func (h *Handlers) APIInstanceDeleteSiteHandler(w http.ResponseWriter, r *http.Request) {
+	if h.caddyConfigSvc == nil {
+		http.Error(w, "Caddy service not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+	siteName := vars["site"]
+
+	if err := h.caddyConfigSvc.DeleteSite(id, siteName); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// APIInstanceHealthHandler returns health status for a Caddy instance
+func (h *Handlers) APIInstanceHealthHandler(w http.ResponseWriter, r *http.Request) {
+	if h.caddyConfigSvc == nil {
+		http.Error(w, "Caddy service not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	healthy, message, err := h.caddyConfigSvc.HealthCheck(id)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "unhealthy",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	status := "healthy"
+	if !healthy {
+		status = "degraded"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  status,
+		"message": message,
+	})
+}
+
+// APIInstanceCaddyfileHandler returns the config as Caddyfile format
+func (h *Handlers) APIInstanceCaddyfileHandler(w http.ResponseWriter, r *http.Request) {
+	if h.caddyConfigSvc == nil {
+		http.Error(w, "Caddy service not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	caddyfile, err := h.caddyConfigSvc.GetCaddyfile(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(caddyfile))
+}

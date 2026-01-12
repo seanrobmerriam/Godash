@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Config Editor - Godash</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .config-editor-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 1.5rem;
+        }
+
+        .editor-main {
+            background: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .editor-toolbar {
+            background: #2d2d2d;
+            padding: 0.75rem 1rem;
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid #3d3d3d;
+        }
+
+        .editor-toolbar .btn {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .editor-content {
+            position: relative;
+        }
+
+        #config-editor {
+            width: 100%;
+            min-height: 500px;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #d4d4d4;
+            background: #1e1e1e;
+            border: none;
+            resize: vertical;
+            outline: none;
+        }
+
+        #config-editor:focus {
+            outline: none;
+        }
+
+        .line-numbers {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 50px;
+            background: #252526;
+            color: #858585;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 1rem 0;
+            text-align: right;
+            padding-right: 1rem;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .editor-with-lines {
+            position: relative;
+            padding-left: 60px;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .sites-list {
+            background: #fff;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .sites-list h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1e293b;
+        }
+
+        .site-item {
+            padding: 0.75rem;
+            background: #f8fafc;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .site-item:hover {
+            background: #f1f5f9;
+        }
+
+        .site-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .site-name {
+            font-weight: 500;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+
+        .site-address {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .quick-actions {
+            background: #fff;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .quick-actions h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1e293b;
+        }
+
+        .action-btn {
+            width: 100%;
+            margin-bottom: 0.5rem;
+            justify-content: center;
+        }
+
+        .action-btn:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: #fff;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .status-dot.online { background: #10b981; }
+        .status-dot.offline { background: #ef4444; }
+        .status-dot.unknown { background: #f59e0b; }
+
+        .instance-info {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+        .toast.info { background: #3b82f6; }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .format-select {
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #4a4a4a;
+            background: #3d3d3d;
+            color: #d4d4d4;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/dashboard" class="logo">Godash</a>
+                <nav class="nav">
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                    <a href="/caddy/instances" class="nav-link">Instances</a>
+                    <a href="/caddy/analytics" class="nav-link">Analytics</a>
+                    <a href="/caddy/instances/{{.InstanceID}}/config" class="nav-link active">Config</a>
+                </nav>
+                <div class="user-nav">
+                    <span class="user-info">Welcome, {{.User.Username}}</span>
+                    <a href="/logout" class="btn btn-secondary">Logout</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Configuration Editor</h1>
+                    <p class="page-subtitle" id="instance-name">Loading...</p>
+                </div>
+                <div class="header-actions">
+                    <select id="config-format" class="select-input" onchange="switchFormat()">
+                        <option value="json">JSON</option>
+                        <option value="caddyfile">Caddyfile</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="config-editor-container">
+                <div class="editor-main">
+                    <div class="editor-toolbar">
+                        <button class="btn btn-primary" onclick="saveConfig()">Save & Reload</button>
+                        <button class="btn btn-secondary" onclick="validateConfig()">Validate</button>
+                        <button class="btn btn-secondary" onclick="formatConfig()">Format</button>
+                        <button class="btn btn-secondary" onclick="copyConfig()">Copy</button>
+                        <button class="btn btn-secondary" onclick="resetConfig()">Reset</button>
+                    </div>
+                    <div class="editor-content">
+                        <div class="line-numbers" id="line-numbers">1</div>
+                        <textarea id="config-editor" spellcheck="false" oninput="updateLineNumbers()"></textarea>
+                    </div>
+                </div>
+
+                <div class="sidebar">
+                    <div class="status-indicator" id="status-indicator">
+                        <div class="status-dot unknown"></div>
+                        <span class="instance-info" id="instance-status">Checking...</span>
+                    </div>
+
+                    <div class="quick-actions">
+                        <h3>Quick Actions</h3>
+                        <button class="btn btn-secondary action-btn" onclick="reloadConfig()">
+                            🔄 Reload Config
+                        </button>
+                        <button class="btn btn-secondary action-btn" onclick="restartServer()">
+                            🔄 Restart Server
+                        </button>
+                        <button class="btn btn-secondary action-btn" onclick="viewLogs()">
+                            📋 View Logs
+                        </button>
+                        <button class="btn btn-secondary action-btn" onclick="exportConfig()">
+                            📥 Export Config
+                        </button>
+                    </div>
+
+                    <div class="sites-list">
+                        <h3>Sites</h3>
+                        <div id="sites-container">
+                            <p style="color: #64748b; font-size: 0.9rem;">Loading sites...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/config-editor.js"></script>
+    <script>
+        // Initialize config editor
+        document.addEventListener('DOMContentLoaded', () => {
+            window.configEditor = new ConfigEditor();
+        });
+    </script>
+</body>
+</html>

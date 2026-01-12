@@ -2,8 +2,10 @@
 class CaddyDashboard {
     constructor() {
         this.instances = [];
+        this.filteredInstances = [];
         this.selectedInstance = null;
         this.refreshInterval = null;
+        this.activeTag = null;
         this.init();
     }
 
@@ -25,6 +27,14 @@ class CaddyDashboard {
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => this.loadInstances());
         }
+
+        // Tag filter buttons
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tag-filter')) {
+                const tag = e.target.dataset.tag;
+                this.filterByTag(tag);
+            }
+        });
 
         // Modal close buttons
         document.querySelectorAll('.modal-close, .modal-cancel').forEach(btn => {
@@ -49,7 +59,10 @@ class CaddyDashboard {
 
             if (data.instances) {
                 this.instances = data.instances;
+                this.filteredInstances = [...this.instances];
                 this.renderInstances();
+                this.renderTagFilters();
+                this.updateStats();
             }
         } catch (error) {
             console.error('Failed to load instances:', error);
@@ -57,23 +70,83 @@ class CaddyDashboard {
         }
     }
 
+    getAllTags() {
+        const tags = new Set();
+        this.instances.forEach(inst => {
+            if (inst.tags) {
+                inst.tags.forEach(tag => tags.add(tag));
+            }
+        });
+        return Array.from(tags).sort();
+    }
+
+    renderTagFilters() {
+        const container = document.getElementById('tag-filters');
+        if (!container) return;
+
+        const tags = this.getAllTags();
+        if (tags.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        // Add "All" filter
+        let html = `
+            <button class="tag-filter ${!this.activeTag ? 'active' : ''}" data-tag="">
+                All
+            </button>
+        `;
+
+        // Add tag filters
+        tags.forEach(tag => {
+            html += `
+                <button class="tag-filter ${this.activeTag === tag ? 'active' : ''}" data-tag="${this.escapeHtml(tag)}">
+                    ${this.escapeHtml(tag)}
+                </button>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    filterByTag(tag) {
+        this.activeTag = tag || null;
+
+        if (!tag) {
+            this.filteredInstances = [...this.instances];
+        } else {
+            this.filteredInstances = this.instances.filter(inst =>
+                inst.tags && inst.tags.includes(tag)
+            );
+        }
+
+        this.renderTagFilters();
+        this.renderInstances();
+    }
+
     renderInstances() {
         const container = document.getElementById('instances-container');
         if (!container) return;
 
-        if (this.instances.length === 0) {
+        if (this.filteredInstances.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <p>No Caddy instances configured</p>
-                    <button class="btn btn-primary" onclick="caddyDashboard.showAddInstanceModal()">
-                        Add First Instance
-                    </button>
+                    <p>${this.activeTag ? `No instances with tag "${this.activeTag}"` : 'No Caddy instances configured'}</p>
+                    ${!this.activeTag ? `
+                        <button class="btn btn-primary" onclick="caddyDashboard.showAddInstanceModal()">
+                            Add First Instance
+                        </button>
+                    ` : `
+                        <button class="btn btn-secondary" onclick="caddyDashboard.filterByTag('')">
+                            Show All Instances
+                        </button>
+                    `}
                 </div>
             `;
             return;
         }
 
-        container.innerHTML = this.instances.map(inst => this.renderInstanceCard(inst)).join('');
+        container.innerHTML = this.filteredInstances.map(inst => this.renderInstanceCard(inst)).join('');
 
         // Add click handlers for each card
         container.querySelectorAll('.instance-card').forEach(card => {
@@ -110,7 +183,9 @@ class CaddyDashboard {
                     <div class="instance-url">${this.escapeHtml(instance.url)}</div>
                     ${instance.tags && instance.tags.length > 0 ? `
                         <div class="instance-tags">
-                            ${instance.tags.map(tag => `<span class="tag">${this.escapeHtml(tag)}</span>`).join('')}
+                            ${instance.tags.map(tag => `
+                                <span class="tag tag-filter" data-tag="${this.escapeHtml(tag)}">${this.escapeHtml(tag)}</span>
+                            `).join('')}
                         </div>
                     ` : ''}
                 </div>
@@ -118,7 +193,7 @@ class CaddyDashboard {
                     <button class="btn btn-sm" data-action="refresh" data-instance-id="${instance.id}" title="Refresh">
                         ↻
                     </button>
-                    <button class="btn btn-sm" data-action="metrics" data-instance-id="${instance.id}" title="Metrics">
+                    <button class="btn btn-sm" data-action="analytics" data-instance-id="${instance.id}" title="Analytics">
                         📊
                     </button>
                     <button class="btn btn-sm" data-action="config" data-instance-id="${instance.id}" title="Config">
@@ -132,6 +207,23 @@ class CaddyDashboard {
         `;
     }
 
+    updateStats() {
+        // Update stats in the page header if element exists
+        const totalEl = document.getElementById('total-instances');
+        const onlineEl = document.getElementById('online-instances');
+        const offlineEl = document.getElementById('offline-instances');
+
+        if (totalEl) totalEl.textContent = this.instances.length;
+        if (onlineEl) {
+            const online = this.instances.filter(i => i.status === 'online').length;
+            onlineEl.textContent = online;
+        }
+        if (offlineEl) {
+            const offline = this.instances.filter(i => i.status === 'offline').length;
+            offlineEl.textContent = offline;
+        }
+    }
+
     selectInstance(instanceId) {
         this.selectedInstance = this.instances.find(i => i.id === instanceId);
         if (this.selectedInstance) {
@@ -140,7 +232,6 @@ class CaddyDashboard {
     }
 
     showInstanceDetails(instance) {
-        // Update details panel or navigate to details page
         window.location.href = `/caddy/instances/${instance.id}`;
     }
 
@@ -149,7 +240,7 @@ class CaddyDashboard {
             case 'refresh':
                 await this.refreshInstance(instanceId);
                 break;
-            case 'metrics':
+            case 'analytics':
                 window.location.href = `/caddy/instances/${instanceId}/analytics`;
                 break;
             case 'config':
@@ -230,7 +321,6 @@ class CaddyDashboard {
     }
 
     startAutoRefresh() {
-        // Refresh every 60 seconds
         this.refreshInterval = setInterval(() => {
             this.loadInstances();
         }, 60000);
@@ -273,7 +363,7 @@ class CaddyDashboard {
     }
 }
 
-// Instance management functions for form handling
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.caddyDashboard = new CaddyDashboard();
 

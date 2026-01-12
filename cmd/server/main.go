@@ -66,7 +66,7 @@ func main() {
 	// Setup routes
 	r := mux.NewRouter()
 
-	// Template rendering helper
+	// Template routes
 	r.HandleFunc("/caddy/instances", func(w http.ResponseWriter, r *http.Request) {
 		user := middleware.GetCurrentUser(r)
 		data := struct {
@@ -81,6 +81,14 @@ func main() {
 			User interface{}
 		}{User: user}
 		templates.ExecuteTemplate(w, "analytics.html", data)
+	}).Methods("GET")
+
+	r.HandleFunc("/caddy/instances/{id}/config", func(w http.ResponseWriter, r *http.Request) {
+		user := middleware.GetCurrentUser(r)
+		data := struct {
+			User interface{}
+		}{User: user}
+		templates.ExecuteTemplate(w, "config-editor.html", data)
 	}).Methods("GET")
 
 	// Public routes
@@ -113,12 +121,23 @@ func main() {
 	caddyAPI.HandleFunc("/instances/{id}", h.APIDeleteInstanceHandler).Methods("DELETE")
 	caddyAPI.HandleFunc("/instances/{id}/test", h.APITestInstanceHandler).Methods("POST")
 	caddyAPI.HandleFunc("/instances/{id}/refresh", h.APIRefreshInstanceHandler).Methods("POST")
+	caddyAPI.HandleFunc("/instances/{id}/health", h.APIInstanceHealthHandler).Methods("GET")
 
 	// Instance operations
 	caddyAPI.HandleFunc("/instances/{id}/metrics", h.APIInstanceMetricsHandler).Methods("GET")
 	caddyAPI.HandleFunc("/instances/{id}/config", h.APIInstanceConfigHandler).Methods("GET")
-	caddyAPI.HandleFunc("/instances/{id}/logs", h.APIInstanceLogsHandler).Methods("GET")
+	caddyAPI.HandleFunc("/instances/{id}/config/json", h.APIInstanceConfigHandler).Methods("GET")
+	caddyAPI.HandleFunc("/instances/{id}/config/caddyfile", h.APIInstanceCaddyfileHandler).Methods("GET")
 	caddyAPI.HandleFunc("/instances/{id}/reload", h.APIInstanceReloadHandler).Methods("POST")
+	caddyAPI.HandleFunc("/instances/{id}/start", h.APIInstanceStartHandler).Methods("POST")
+	caddyAPI.HandleFunc("/instances/{id}/stop", h.APIInstanceStopHandler).Methods("POST")
+	caddyAPI.HandleFunc("/instances/{id}/restart", h.APIInstanceRestartHandler).Methods("POST")
+	caddyAPI.HandleFunc("/instances/{id}/logs", h.APIInstanceLogsHandler).Methods("GET")
+
+	// Site management
+	caddyAPI.HandleFunc("/instances/{id}/sites", h.APIInstanceSitesHandler).Methods("GET")
+	caddyAPI.HandleFunc("/instances/{id}/sites", h.APIInstanceCreateSiteHandler).Methods("POST")
+	caddyAPI.HandleFunc("/instances/{id}/sites/{site}", h.APIInstanceDeleteSiteHandler).Methods("DELETE")
 
 	// Admin API routes (admin only)
 	adminAPI := api.PathPrefix("/admin").Subrouter()
