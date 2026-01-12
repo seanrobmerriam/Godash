@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - Godash</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/dashboard" class="logo">Godash</a>
+                <nav class="nav">
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                    <a href="/caddy/instances" class="nav-link">Instances</a>
+                    <a href="/caddy/analytics" class="nav-link active">Analytics</a>
+                </nav>
+                <div class="user-nav">
+                    <span class="user-info">Welcome, {{.User.Username}}</span>
+                    <a href="/logout" class="btn btn-secondary">Logout</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Analytics</h1>
+                    <p class="page-subtitle">Monitor your Caddy server performance</p>
+                </div>
+                <div class="header-actions">
+                    <select id="instance-select" class="select-input">
+                        <option value="">Select Instance</option>
+                    </select>
+                    <select id="time-range" class="select-input">
+                        <option value="1h">Last Hour</option>
+                        <option value="6h" selected>Last 6 Hours</option>
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                    </select>
+                    <button id="refresh-analytics" class="btn btn-primary">Refresh</button>
+                </div>
+            </div>
+
+            <!-- Summary Metrics -->
+            <div class="stats-grid" id="analytics-stats">
+                <div class="stat-card">
+                    <div class="stat-label">Total Requests</div>
+                    <div class="stat-value" id="total-requests">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Bandwidth</div>
+                    <div class="stat-value" id="total-bandwidth">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Response Time</div>
+                    <div class="stat-value" id="avg-response-time">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Error Rate</div>
+                    <div class="stat-value" id="error-rate">-</div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="dashboard-grid">
+                <!-- Requests Over Time -->
+                <div class="widget widget-lg widget-height-md">
+                    <div class="widget-header">
+                        <h3 class="widget-title">Requests Over Time</h3>
+                        <button class="widget-refresh" data-chart="requests">↻</button>
+                    </div>
+                    <div class="widget-content">
+                        <div id="requests-chart" class="chart-container"></div>
+                    </div>
+                </div>
+
+                <!-- Response Codes -->
+                <div class="widget widget-sm widget-height-md">
+                    <div class="widget-header">
+                        <h3 class="widget-title">Response Codes</h3>
+                        <button class="widget-refresh" data-chart="codes">↻</button>
+                    </div>
+                    <div class="widget-content">
+                        <div id="codes-chart" class="chart-container"></div>
+                    </div>
+                </div>
+
+                <!-- Bandwidth Usage -->
+                <div class="widget widget-lg widget-height-md">
+                    <div class="widget-header">
+                        <h3 class="widget-title">Bandwidth Usage</h3>
+                        <button class="widget-refresh" data-chart="bandwidth">↻</button>
+                    </div>
+                    <div class="widget-content">
+                        <div id="bandwidth-chart" class="chart-container"></div>
+                    </div>
+                </div>
+
+                <!-- Top Sites -->
+                <div class="widget widget-md widget-height-md">
+                    <div class="widget-header">
+                        <h3 class="widget-title">Top Sites</h3>
+                    </div>
+                    <div class="widget-content">
+                        <table class="data-table" id="sites-table">
+                            <thead>
+                                <tr>
+                                    <th>Site</th>
+                                    <th>Requests</th>
+                                    <th>Bandwidth</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="3">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Status Code Breakdown -->
+                <div class="widget widget-md widget-height-md">
+                    <div class="widget-header">
+                        <h3 class="widget-title">Status Code Breakdown</h3>
+                    </div>
+                    <div class="widget-content">
+                        <table class="data-table" id="status-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Count</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="3">No data</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/metrics-chart.js"></script>
+    <script>
+        class AnalyticsDashboard {
+            constructor() {
+                this.charts = {};
+                this.selectedInstance = null;
+                this.timeRange = '6h';
+                this.init();
+            }
+
+            async init() {
+                this.setupEventListeners();
+                await this.loadInstances();
+                this.startAutoRefresh();
+            }
+
+            setupEventListeners() {
+                // Instance select
+                document.getElementById('instance-select').addEventListener('change', (e) => {
+                    this.selectedInstance = e.target.value;
+                    if (this.selectedInstance) {
+                        this.loadAnalytics();
+                    }
+                });
+
+                // Time range select
+                document.getElementById('time-range').addEventListener('change', (e) => {
+                    this.timeRange = e.target.value;
+                    if (this.selectedInstance) {
+                        this.loadAnalytics();
+                    }
+                });
+
+                // Refresh button
+                document.getElementById('refresh-analytics').addEventListener('click', () => {
+                    if (this.selectedInstance) {
+                        this.loadAnalytics();
+                    }
+                });
+
+                // Widget refresh buttons
+                document.querySelectorAll('.widget-refresh').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const chartType = e.target.dataset.chart;
+                        if (this.charts[chartType]) {
+                            this.loadAnalytics();
+                        }
+                    });
+                });
+            }
+
+            async loadInstances() {
+                try {
+                    const response = await fetch('/api/caddy/instances');
+                    const data = await response.json();
+
+                    const select = document.getElementById('instance-select');
+                    if (data.instances) {
+                        data.instances.forEach(inst => {
+                            const option = document.createElement('option');
+                            option.value = inst.id;
+                            option.textContent = inst.name;
+                            select.appendChild(option);
+                        });
+
+                        // Auto-select first online instance
+                        const onlineInstance = data.instances.find(i => i.status === 'online');
+                        if (onlineInstance) {
+                            select.value = onlineInstance.id;
+                            this.selectedInstance = onlineInstance.id;
+                            this.loadAnalytics();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to load instances:', error);
+                }
+            }
+
+            async loadAnalytics() {
+                if (!this.selectedInstance) return;
+
+                try {
+                    // Load current metrics
+                    const metricsRes = await fetch(`/api/caddy/instances/${this.selectedInstance}/metrics`);
+                    const metricsData = await metricsRes.json();
+
+                    if (metricsData.metrics) {
+                        this.updateSummary(metricsData.metrics);
+                        this.renderCharts(metricsData.metrics);
+                    }
+
+                    // Load history for charts
+                    const historyRes = await fetch(`/api/caddy/analytics/${this.selectedInstance}?range=${this.timeRange}`);
+                    const historyData = await historyRes.json();
+
+                    if (historyData.history) {
+                        this.renderHistoryCharts(historyData.history);
+                    }
+                } catch (error) {
+                    console.error('Failed to load analytics:', error);
+                    this.showError('Failed to load analytics data');
+                }
+            }
+
+            updateSummary(metrics) {
+                document.getElementById('total-requests').textContent = this.formatNumber(metrics.num_requests || 0);
+                document.getElementById('total-bandwidth').textContent = this.formatBytes(metrics.total_traffic || 0);
+
+                // Calculate error rate
+                let errorCount = 0;
+                let totalCount = 0;
+                if (metrics.status_codes) {
+                    for (const [code, count] of Object.entries(metrics.status_codes)) {
+                        const codeNum = parseInt(code);
+                        if (codeNum >= 400) {
+                            errorCount += count;
+                        }
+                        totalCount += count;
+                    }
+                }
+                const errorRate = totalCount > 0 ? ((errorCount / totalCount) * 100).toFixed(2) : 0;
+                document.getElementById('error-rate').textContent = `${errorRate}%`;
+            }
+
+            renderCharts(metrics) {
+                // Response codes pie chart
+                if (metrics.status_codes) {
+                    const codesData = Object.entries(metrics.status_codes)
+                        .map(([code, count]) => ({
+                            label: code,
+                            value: count
+                        }))
+                        .sort((a, b) => b.value - a.value)
+                        .slice(0, 6);
+
+                    this.charts['codes'] = createChart('codes-chart', 'pie', codesData);
+                }
+            }
+
+            renderHistoryCharts(history) {
+                if (!history || history.length === 0) return;
+
+                // Requests over time (line chart)
+                const requestsData = history.map(m => ({
+                    label: new Date(m.timestamp).toLocaleTimeString(),
+                    value: m.num_requests || 0
+                }));
+
+                this.charts['requests'] = createChart('requests-chart', 'line', requestsData, {
+                    color: '#3b82f6',
+                    fillColor: 'rgba(59, 130, 246, 0.1)'
+                });
+
+                // Bandwidth over time (line chart)
+                const bandwidthData = history.map(m => ({
+                    label: new Date(m.timestamp).toLocaleTimeString(),
+                    value: (m.total_traffic || 0) / 1024 / 1024 // Convert to MB
+                }));
+
+                this.charts['bandwidth'] = createChart('bandwidth-chart', 'line', bandwidthData, {
+                    color: '#10b981',
+                    fillColor: 'rgba(16, 185, 129, 0.1)',
+                    label: 'MB'
+                });
+
+                // Update sites table
+                if (history.length > 0 && history[0].sites) {
+                    this.updateSitesTable(history[0].sites);
+                }
+
+                // Aggregate status codes
+                const aggregatedCodes = {};
+                history.forEach(m => {
+                    if (m.status_codes) {
+                        for (const [code, count] of Object.entries(m.status_codes)) {
+                            aggregatedCodes[code] = (aggregatedCodes[code] || 0) + count;
+                        }
+                    }
+                });
+
+                this.updateStatusTable(aggregatedCodes);
+            }
+
+            updateSitesTable(sites) {
+                const tbody = document.querySelector('#sites-table tbody');
+                if (!sites || Object.keys(sites).length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3">No site data</td></tr>';
+                    return;
+                }
+
+                const sortedSites = Object.values(sites)
+                    .sort((a, b) => b.requests - a.requests)
+                    .slice(0, 10);
+
+                tbody.innerHTML = sortedSites.map(site => `
+                    <tr>
+                        <td>${this.escapeHtml(site.name)}</td>
+                        <td>${this.formatNumber(site.requests)}</td>
+                        <td>${this.formatBytes(site.bytes_sent)}</td>
+                    </tr>
+                `).join('');
+            }
+
+            updateStatusTable(codes) {
+                const tbody = document.querySelector('#status-table tbody');
+                if (!codes || Object.keys(codes).length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3">No status data</td></tr>';
+                    return;
+                }
+
+                const total = Object.values(codes).reduce((a, b) => a + b, 0);
+                const sortedCodes = Object.entries(codes)
+                    .sort((a, b) => b[1] - a[1]);
+
+                tbody.innerHTML = sortedCodes.map(([code, count]) => {
+                    const percentage = ((count / total) * 100).toFixed(1);
+                    return `
+                        <tr>
+                            <td><span class="status-badge status-${code >= 400 ? 'error' : 'success'}">${code}</span></td>
+                            <td>${this.formatNumber(count)}</td>
+                            <td>${percentage}%</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            formatNumber(num) {
+                if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+                if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+                return num.toString();
+            }
+
+            formatBytes(bytes) {
+                if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+                if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+                if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+                return bytes + ' B';
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            showError(message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-notification';
+                errorDiv.textContent = message;
+                errorDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #fee2e2;
+                    color: #dc2626;
+                    padding: 1rem;
+                    border-radius: 6px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    z-index: 1000;
+                `;
+                document.body.appendChild(errorDiv);
+                setTimeout(() => errorDiv.remove(), 5000);
+            }
+
+            startAutoRefresh() {
+                this.refreshInterval = setInterval(() => {
+                    if (this.selectedInstance) {
+                        this.loadAnalytics();
+                    }
+                }, 60000);
+            }
+
+            stopAutoRefresh() {
+                if (this.refreshInterval) {
+                    clearInterval(this.refreshInterval);
+                }
+            }
+        }
+
+        // Initialize analytics dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+            window.analyticsDashboard = new AnalyticsDashboard();
+        });
+    </script>
+</body>
+</html>

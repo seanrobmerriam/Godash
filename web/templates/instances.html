@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caddy Instances - Godash</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/dashboard" class="logo">Godash</a>
+                <nav class="nav">
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                    <a href="/caddy/instances" class="nav-link active">Caddy Instances</a>
+                </nav>
+                <div class="user-nav">
+                    <span class="user-info">Welcome, {{.User.Username}}</span>
+                    <a href="/logout" class="btn btn-secondary">Logout</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="page-title">Caddy Instances</h1>
+                <button id="add-instance-btn" class="btn btn-primary">Add Instance</button>
+            </div>
+
+            <!-- Stats Summary -->
+            <div class="stats-grid" id="instance-stats">
+                <div class="stat-card">
+                    <div class="stat-label">Total Instances</div>
+                    <div class="stat-value" id="total-instances">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Online</div>
+                    <div class="stat-value" id="online-instances" style="color: #10b981;">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Offline</div>
+                    <div class="stat-value" id="offline-instances" style="color: #ef4444;">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Unknown</div>
+                    <div class="stat-value" id="unknown-instances" style="color: #f59e0b;">-</div>
+                </div>
+            </div>
+
+            <!-- Instances Grid -->
+            <div id="instances-container" class="instances-grid">
+                <!-- Instances will be rendered here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Instance Modal -->
+    <div id="add-instance-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Caddy Instance</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="add-instance-form">
+                <div class="form-group">
+                    <label for="instance-name">Name</label>
+                    <input type="text" id="instance-name" name="name" required placeholder="My Caddy Server">
+                </div>
+                <div class="form-group">
+                    <label for="instance-url">Admin API URL</label>
+                    <input type="url" id="instance-url" name="url" required placeholder="http://localhost:2019">
+                    <small>The URL of the Caddy admin API</small>
+                </div>
+                <div class="form-group">
+                    <label for="instance-api-key-file">API Key File (optional)</label>
+                    <input type="text" id="instance-api-key-file" name="api_key_file" placeholder="/path/to/api-key.txt">
+                    <small>Path to file containing the API key</small>
+                </div>
+                <div class="form-group">
+                    <label for="instance-tags">Tags (comma-separated)</label>
+                    <input type="text" id="instance-tags" name="tags" placeholder="production, web">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Instance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/caddy.js"></script>
+    <script>
+        // Override renderInstances to add stats
+        const originalRenderInstances = CaddyDashboard.prototype.renderInstances;
+        CaddyDashboard.prototype.renderInstances = function() {
+            originalRenderInstances.call(this);
+
+            // Update stats
+            const total = this.instances.length;
+            const online = this.instances.filter(i => i.status === 'online').length;
+            const offline = this.instances.filter(i => i.status === 'offline').length;
+            const unknown = total - online - offline;
+
+            document.getElementById('total-instances').textContent = total;
+            document.getElementById('online-instances').textContent = online;
+            document.getElementById('offline-instances').textContent = offline;
+            document.getElementById('unknown-instances').textContent = unknown;
+        };
+    </script>
+</body>
+</html>

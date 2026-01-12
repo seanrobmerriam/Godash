@@ -11,6 +11,11 @@
         <div class="container">
             <div class="header-content">
                 <a href="/dashboard" class="logo">Godash</a>
+                <nav class="nav">
+                    <a href="/dashboard" class="nav-link active">Dashboard</a>
+                    <a href="/caddy/instances" class="nav-link">Instances</a>
+                    <a href="/caddy/analytics" class="nav-link">Analytics</a>
+                </nav>
                 <div class="user-nav">
                     <span class="user-info">Welcome, {{.User.Username}}</span>
                     <a href="/logout" class="btn btn-secondary">Logout</a>
@@ -100,6 +105,27 @@
                         <div class="widget-content">
                             <!-- Content will be populated by JavaScript -->
                         </div>
+                    </div>
+                </div>
+
+                <!-- Caddy Quick Links -->
+                <div class="quick-links mt-4">
+                    <h2 class="section-title">Caddy Management</h2>
+                    <div class="quick-links-grid">
+                        <a href="/caddy/instances" class="quick-link-card">
+                            <div class="quick-link-icon">🖥️</div>
+                            <div class="quick-link-text">
+                                <h3>Instances</h3>
+                                <p>Manage your Caddy server instances</p>
+                            </div>
+                        </a>
+                        <a href="/caddy/analytics" class="quick-link-card">
+                            <div class="quick-link-icon">📊</div>
+                            <div class="quick-link-text">
+                                <h3>Analytics</h3>
+                                <p>View metrics and performance data</p>
+                            </div>
+                        </a>
                     </div>
                 </div>
             </div>

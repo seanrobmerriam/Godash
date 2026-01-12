@@ -7,6 +7,7 @@ import (
 	"godash/internal/handlers"
 	"godash/internal/middleware"
 	"godash/internal/services"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -26,9 +27,14 @@ func main() {
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(cfg.Session.SecretKey, userService)
 
+	// Parse templates
+	templates, err := template.ParseGlob("web/templates/*.html")
+	if err != nil {
+		log.Fatalf("Failed to parse templates: %v", err)
+	}
+
 	// Initialize Caddy services
 	var h *handlers.Handlers
-	var err error
 
 	// Create data directory
 	dataDir := "data"
@@ -59,6 +65,23 @@ func main() {
 
 	// Setup routes
 	r := mux.NewRouter()
+
+	// Template rendering helper
+	r.HandleFunc("/caddy/instances", func(w http.ResponseWriter, r *http.Request) {
+		user := middleware.GetCurrentUser(r)
+		data := struct {
+			User interface{}
+		}{User: user}
+		templates.ExecuteTemplate(w, "instances.html", data)
+	}).Methods("GET")
+
+	r.HandleFunc("/caddy/analytics", func(w http.ResponseWriter, r *http.Request) {
+		user := middleware.GetCurrentUser(r)
+		data := struct {
+			User interface{}
+		}{User: user}
+		templates.ExecuteTemplate(w, "analytics.html", data)
+	}).Methods("GET")
 
 	// Public routes
 	r.HandleFunc("/", h.HomeHandler)
@@ -105,6 +128,8 @@ func main() {
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
 	log.Printf("Starting server on %s", addr)
 	log.Printf("Dashboard available at: http://%s/dashboard", addr)
+	log.Printf("Caddy Instances: http://%s/caddy/instances", addr)
+	log.Printf("Caddy Analytics: http://%s/caddy/analytics", addr)
 	log.Printf("Default credentials: admin / password")
 	log.Printf("Caddy API available at: http://%s/api/caddy", addr)
 
